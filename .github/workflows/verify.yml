@@ -24,7 +24,7 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     # Use the official Dafny container so no install is needed.
-    container: ghcr.io/dafny-lang/dafny:4.11.0
+    container: ghcr.io/dafny-lang/dafny:latest
 
     permissions:
       contents: read
