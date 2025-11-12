@@ -6,7 +6,8 @@ on:
         - '**/*.dfy'
         - 'specs/**'
 
-        #Worflow  itself
+        #WorKflow  itself
+
         - .github/workflows/verify.yml'
 
 
@@ -16,6 +17,8 @@ on:
         - '**/*.dfy'
         - 'specs/**'
         - .github/workflows/verify.yml'
+  workflow_dispatch:     
+
 
 jobs:
   verify:
