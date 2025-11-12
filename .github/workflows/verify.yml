@@ -26,6 +26,10 @@ jobs:
     # Use the official Dafny container so no install is needed.
     container: ghcr.io/dafny-lang/dafny:4.11.0
 
+    permissions:
+      contents: read
+      packages: read
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
