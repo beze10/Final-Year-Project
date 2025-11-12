@@ -2,7 +2,20 @@ name: dafny-verify
 
 on:
   push:
+    paths:
+        - '**/*.dfy'
+        - 'specs/**'
+
+        #Worflow  itself
+        - .github/workflows/verify.yml'
+
+
   pull_request:
+    branches: [ main ]
+    paths:
+        - '**/*.dfy'
+        - 'specs/**'
+        - .github/workflows/verify.yml'
 
 jobs:
   verify:
