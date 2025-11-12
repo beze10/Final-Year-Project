@@ -1,0 +1,57 @@
+name: dafny-verify
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    # Use the official Dafny container so no install is needed
+    container: ghcr.io/dafny-lang/dafny:4.11.0
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: List Dafny version
+        run: dafny --version
+
+      - name: Find .dfy files
+        id: list
+        shell: bash
+        run: |
+          # adjust or add paths as needed
+          mapfile -t FILES < <(git ls-files '*.dfy' ':!:**/bin/**' ':!:**/obj/**')
+          if [ ${#FILES[@]} -eq 0 ]; then
+            echo "No .dfy files found."
+            exit 0
+          fi
+          printf '%s\n' "${FILES[@]}"
+          # expose as an output for the next step
+          printf "files=%s\n" "$(printf '%s ' "${FILES[@]}")" >> "$GITHUB_OUTPUT"
+
+      - name: Verify all Dafny files
+        if: steps.list.outputs.files != ''
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          set -euo pipefail
+          # Run verification per file so logs are clear per unit
+          fail=0
+          for f in ${FILES:=}; do
+            echo "=== Verifying: $f ===" | tee -a artifacts/dafny.log
+            if ! dafny verify "$f" | tee -a artifacts/dafny.log; then
+              echo "Verification failed for $f" | tee -a artifacts/dafny.log
+              fail=1
+            fi
+            echo "" | tee -a artifacts/dafny.log
+          done
+          exit $fail
+
+      - name: Upload Dafny logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dafny-artifacts
+          path: artifacts/

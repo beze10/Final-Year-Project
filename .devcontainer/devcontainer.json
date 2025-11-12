@@ -1,0 +1,17 @@
+{
+    "name": "dafny",
+    "image": "xtrm0/dafny:latest",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "dafny-lang.ide-vscode"
+            ],
+            "settings": {
+                "dafny.automaticVerification": true,
+                "editor.formatOnSave": true
+            }
+        }
+    },
+    "postCreateCommand": "mkdir -p artifacts specs/dafny",
+    "remoteUser": "root"
+}
