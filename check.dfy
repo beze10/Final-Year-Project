@@ -32,3 +32,4 @@ method Demo()
 
    var bad := SafeDiv(10, 0); 
 }
+// trigger
