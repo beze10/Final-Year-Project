@@ -19,22 +19,23 @@ jobs:
           set -e
           mkdir -p artifacts
 
+          # Find .dfy files OUTSIDE Docker (Git is available here)
+          files=$(find . -name "*.dfy")
+          if [ -z "$files" ]; then
+            echo "No .dfy files found"
+            exit 0
+          fi
+
+          # Pass the list of files into Docker
           docker run --rm -v "$PWD:/work" -w /work xtrm0/dafny:3.11.0 bash -c "
             set -euo pipefail
 
-            # Find all tracked .dfy files inside the container
-            files=\$(git ls-files '*.dfy')
-            if [ -z \"\$files\" ]; then
-              echo 'No .dfy files found'
-              exit 0
-            fi
-
             dafny /version | tee artifacts/dafny.log
 
-            for f in \$files; do
+            for f in $files; do
               echo \"=== Verifying \$f ===\" | tee -a artifacts/dafny.log
 
-              # Run Dafny and fail the workflow if verification fails
+              # Fail the workflow if Dafny verification fails
               if ! dafny verify \"\$f\" >> artifacts/dafny.log 2>&1; then
                 echo \"Verification FAILED for \$f\" | tee -a artifacts/dafny.log
                 exit 1
