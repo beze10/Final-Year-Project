@@ -10,29 +10,35 @@ on:
 jobs:
   dafny:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify Dafny files via Docker Hub image
+      - name: Verify Dafny files via Docker
         run: |
           set -e
           mkdir -p artifacts
 
-          # Find all .dfy files OUTSIDE Docker
-          files=$(find . -name "*.dfy")
-          if [ -z "$files" ]; then
-            echo "No .dfy files found"
-            exit 0
-          fi
-
-          docker run --rm -v "$PWD:/work" -w /work xtrm0/dafny:3.11.0 bash -lc "
+          docker run --rm -v "$PWD:/work" -w /work xtrm0/dafny:3.11.0 bash -c "
             set -euo pipefail
 
-            dafny /version | tee -a artifacts/dafny.log
+            # Find all tracked .dfy files inside the container
+            files=\$(git ls-files '*.dfy')
+            if [ -z \"\$files\" ]; then
+              echo 'No .dfy files found'
+              exit 0
+            fi
 
-            for f in $files; do
-              echo '=== Verifying $f ===' | tee -a artifacts/dafny.log
-              dafny verify \"$f\" 2>&1 | tee -a artifacts/dafny.log
+            dafny /version | tee artifacts/dafny.log
+
+            for f in \$files; do
+              echo \"=== Verifying \$f ===\" | tee -a artifacts/dafny.log
+
+              # Run Dafny and fail the workflow if verification fails
+              if ! dafny verify \"\$f\" >> artifacts/dafny.log 2>&1; then
+                echo \"Verification FAILED for \$f\" | tee -a artifacts/dafny.log
+                exit 1
+              fi
             done
           "
 
