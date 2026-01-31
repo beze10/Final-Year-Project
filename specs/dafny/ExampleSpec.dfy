@@ -1,5 +1,6 @@
-method Add(a: int, b: int) returns (c: int)
-  ensures c == a + b + 1
+method Max(a: int, b: int) returns (m: int)
+  ensures m >= a
+  ensures m >= b
 {
-  c := a + b;
+  m := a;
 }
