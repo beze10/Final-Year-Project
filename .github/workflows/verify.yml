@@ -1,9 +1,10 @@
 name: dafny-verify
+
 on:
   push:
-    paths: ['**/*.dfy','specs/**','.github/workflows/verify.yml']
+    paths: ['**/*.dfy', 'specs/**', '.github/workflows/verify.yml']
   pull_request:
-    paths: ['**/*.dfy','specs/**','.github/workflows/verify.yml']
+    paths: ['**/*.dfy', 'specs/**', '.github/workflows/verify.yml']
   workflow_dispatch:
 
 jobs:
@@ -18,18 +19,24 @@ jobs:
         run: |
           set -e
           mkdir -p artifacts
-          files=$(git ls-files '*.dfy')
-          if [ -z "$files" ]; then
-            echo "No .dfy files"; exit 0
-          fi
+
           docker run --rm -v "$PWD:/work" -w /work xtrm0/dafny:3.11.0 bash -lc '
-            set -e
+            set -euo pipefail
+
+            files=$(git ls-files "*.dfy")
+            if [ -z "$files" ]; then
+              echo "No .dfy files found"
+              exit 0
+            fi
+
+            dafny /version | tee -a artifacts/dafny.log
+
             for f in $files; do
               echo "=== Verifying $f ===" | tee -a artifacts/dafny.log
-              dafny /version
-              dafny verify "$f" | tee -a artifacts/dafny.log
+              dafny verify "$f" 2>&1 | tee -a artifacts/dafny.log
             done
           '
+
       - name: Upload Dafny logs
         if: always()
         uses: actions/upload-artifact@v4
