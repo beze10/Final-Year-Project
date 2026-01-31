@@ -10,38 +10,39 @@ on:
 jobs:
   dafny:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
 
       - name: Verify Dafny files via Docker
         run: |
-          set -e
+          set -euo pipefail
           mkdir -p artifacts
 
-          # Find .dfy files OUTSIDE Docker (Git is available here)
-          files=$(find . -name "*.dfy")
-          if [ -z "$files" ]; then
+          # Build a safe, line-by-line file list on the runner
+          find . -type f -name "*.dfy" \
+            -not -path "./.git/*" \
+            -not -path "./node_modules/*" \
+            -not -path "./artifacts/*" \
+            > artifacts/dfy-files.txt
+
+          if [ ! -s artifacts/dfy-files.txt ]; then
             echo "No .dfy files found"
             exit 0
           fi
 
-          # Pass the list of files into Docker
-          docker run --rm -v "$PWD:/work" -w /work xtrm0/dafny:3.11.0 bash -c "
-            set -euo pipefail
+          docker run --rm \
+            -v "$PWD:/work" -w /work \
+            xtrm0/dafny:3.11.0 \
+            bash -lc '
+              set -euo pipefail
 
-            dafny /version | tee artifacts/dafny.log
+              dafny /version | tee -a artifacts/dafny.log
 
-            for f in $files; do
-              echo \"=== Verifying \$f ===\" | tee -a artifacts/dafny.log
-
-              # Fail the workflow if Dafny verification fails
-              if ! dafny verify \"\$f\" >> artifacts/dafny.log 2>&1; then
-                echo \"Verification FAILED for \$f\" | tee -a artifacts/dafny.log
-                exit 1
-              fi
-            done
-          "
+              while IFS= read -r f; do
+                echo "=== Verifying $f ===" | tee -a artifacts/dafny.log
+                dafny verify "$f" 2>&1 | tee -a artifacts/dafny.log
+              done < artifacts/dfy-files.txt
+            '
 
       - name: Upload Dafny logs
         if: always()
@@ -49,3 +50,4 @@ jobs:
         with:
           name: dafny-artifacts
           path: artifacts/
+
