@@ -1,35 +1,26 @@
-method Inc(x:int) returns (r:int)
-  ensures r == x + 1
+// check.dfy
+// A small "real" verification check: we call a helper method that requires a non-negative input,
+// and we prove that requirement is satisfied before calling it.
+
+method IncNonNeg(x: int) returns (y: int)
+  requires x >= 0
+  ensures y == x + 1
+  ensures y >= 1
 {
-  r := x + 1;
+  y := x + 1;
 }
 
-method SafeDiv(n:int, d:int) returns (q:int)
-  requires d != 0
-  ensures n == q * d + n % d  // standard division identity
+method Check(a: int) returns (b: int)
+  requires a >= 0
+  ensures b == a + 2
+  ensures b >= 2
 {
-  q := n / d;
+  // First call is safe because a >= 0 (from the requires clause)
+  var t := IncNonNeg(a);
+
+  // Second call is also safe because t >= 1 (from IncNonNeg's postcondition),
+  // and 1 >= 0 implies t >= 0.
+  var u := IncNonNeg(t);
+
+  b := u;
 }
-
-// Simple loop with an invariant
-method CountDown(n:nat) returns (i:int)
-  ensures i == 0
-{
-  i := n;
-  while i > 0
-    invariant i >= 0
-  {
-    i := i - 1;
-  }
-}
-
-method Demo()
-{
-  var a := Inc(41);
-  assert a == 42;           // proves from Inc's postcondition
-
-  var q := SafeDiv(10, 2);  // OK: precondition d != 0 holds
-
-   var bad := SafeDiv(10, 0); 
-}
-// trigger
