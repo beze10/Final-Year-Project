@@ -1,0 +1,22 @@
+name: semgrep
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Semgrep
+        run: python3 -m pip install semgrep
+
+      # Show all findings (for visibility)
+      - name: Semgrep report (all severities)
+        run: semgrep scan --config semgrep/semgrep.yml
+
+      # Hard gate: fail only on ERROR
+      - name: Semgrep gate (ERROR only)
+        run: semgrep scan --config semgrep/semgrep.yml --severity=ERROR --error
