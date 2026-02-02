@@ -1,6 +1,9 @@
 {
     "name": "dafny",
-    "image": "xtrm0/dafny:latest",
+    "image": "xtrm0/dafny@sha256:57df85811f650c9c5ecf8aa94f8193c61173b60e88ea43c5a7703740c3e4afbd",
+    "features": {
+        "ghcr.io/devcontainers/features/git:1": {}
+    },
     "customizations": {
         "vscode": {
             "extensions": [
