@@ -1,0 +1,7 @@
+rules:
+  - id: python-no-eval
+    languages:
+      - python
+    message: "Avoid using eval() due to security risks."
+    severity: ERROR
+    pattern: eval(...)
