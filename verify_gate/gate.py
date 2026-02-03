@@ -4,24 +4,94 @@ import sys
 from pathlib import Path
 
 
+# ---- Config (edit if you want) ----
+DAFNY_TARGETS = [
+    "check.dfy",
+    "specs/dafny",   # folder: will verify all *.dfy inside
+]
+
 SEMGRP_CONFIG = "semgrep/semgrep.yml"
-SEMGRP_OUT = "artifacts/semgrep.json"
+
+ARTIFACTS_DIR = Path("artifacts")
+DAFNY_LOG = ARTIFACTS_DIR / "dafny.log"
+SEMGRP_JSON = ARTIFACTS_DIR / "semgrep.json"
 
 
-def run_semgrep(config_path: str = SEMGRP_CONFIG, out_path: str = SEMGRP_OUT) -> int:
+def _collect_dafny_files(targets: list[str]) -> list[str]:
+    files: list[str] = []
+    for t in targets:
+        p = Path(t)
+        if p.is_file() and p.suffix == ".dfy":
+            files.append(str(p))
+        elif p.is_dir():
+            files.extend(str(x) for x in sorted(p.rglob("*.dfy")))
+    # Deduplicate while preserving order
+    seen = set()
+    out = []
+    for f in files:
+        if f not in seen:
+            seen.add(f)
+            out.append(f)
+    return out
+
+
+def run_dafny() -> bool:
     """
-    Runs Semgrep using the given config, writes JSON output to artifacts,
-    and returns the number of ERROR-severity findings.
+    Runs Dafny verification on configured .dfy files.
+    Writes combined output to artifacts/dafny.log
+    Returns True on success, False on failure.
     """
-    Path("artifacts").mkdir(parents=True, exist_ok=True)
+    ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    cmd = ["semgrep", "scan", "--config", config_path, "--json"]
+    dfy_files = _collect_dafny_files(DAFNY_TARGETS)
+    if not dfy_files:
+        print("[GATE] No Dafny files found. Skipping Dafny.")
+        DAFNY_LOG.write_text("[GATE] No Dafny files found. Skipped.\n", encoding="utf-8")
+        return True
+
+    try:
+        ver = subprocess.run(["dafny", "--version"], capture_output=True, text=True)
+    except FileNotFoundError:
+        print("[GATE] dafny not found on PATH.", file=sys.stderr)
+        return False
+
+    header = f"[GATE] Dafny version:\n{ver.stdout.strip() or ver.stderr.strip()}\n\n"
+    print(header.strip())
+
+    # Verify all files in one command (faster, single log)
+    cmd = ["dafny", "verify", *dfy_files]
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+
+    log_text = header
+    log_text += "[GATE] Dafny command:\n" + " ".join(cmd) + "\n\n"
+    log_text += "[GATE] Dafny stdout:\n" + (proc.stdout or "") + "\n"
+    log_text += "[GATE] Dafny stderr:\n" + (proc.stderr or "") + "\n"
+    DAFNY_LOG.write_text(log_text, encoding="utf-8")
+
+    if proc.returncode != 0:
+        print(f"[GATE] Dafny FAIL (return code {proc.returncode}). See {DAFNY_LOG}", file=sys.stderr)
+        return False
+
+    print("[GATE] Dafny PASS")
+    return True
+
+
+def run_semgrep() -> tuple[bool, int]:
+    """
+    Runs Semgrep using semgrep/semgrep.yml
+    Writes JSON output to artifacts/semgrep.json
+    Returns (ok, error_count)
+    ok=False means Semgrep couldn't run or output couldn't be parsed.
+    """
+    ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    cmd = ["semgrep", "scan", "--config", SEMGRP_CONFIG, "--json"]
 
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True)
     except FileNotFoundError:
-        print("[GATE] semgrep not found. Is it installed in the container?", file=sys.stderr)
-        return -1
+        print("[GATE] semgrep not found on PATH.", file=sys.stderr)
+        return (False, 0)
 
     stdout = (proc.stdout or "").strip()
     stderr = (proc.stderr or "").strip()
@@ -30,10 +100,9 @@ def run_semgrep(config_path: str = SEMGRP_CONFIG, out_path: str = SEMGRP_OUT) ->
         print("[GATE] Semgrep produced no JSON output.", file=sys.stderr)
         if stderr:
             print(stderr, file=sys.stderr)
-        return -1
+        return (False, 0)
 
-    # Save JSON for later (even if you "deal with artifacts later", this is harmless)
-    Path(out_path).write_text(stdout, encoding="utf-8")
+    SEMGRP_JSON.write_text(stdout, encoding="utf-8")
 
     try:
         data = json.loads(stdout)
@@ -41,40 +110,46 @@ def run_semgrep(config_path: str = SEMGRP_CONFIG, out_path: str = SEMGRP_OUT) ->
         print("[GATE] Semgrep output was not valid JSON.", file=sys.stderr)
         if stderr:
             print(stderr, file=sys.stderr)
-        return -1
+        return (False, 0)
 
     results = data.get("results", [])
     error_count = 0
-
     for r in results:
-        # Semgrep usually stores rule severity here
         sev = (r.get("extra", {}) or {}).get("severity", "")
         if str(sev).upper() == "ERROR":
             error_count += 1
 
     print(f"[GATE] Semgrep findings: {len(results)} total, {error_count} ERROR")
 
-    # If semgrep command had a non-zero return code, print stderr for visibility
+    # If semgrep itself had issues, show stderr for debugging, but gate is still on ERROR count
     if proc.returncode != 0 and stderr:
         print("[GATE] Semgrep stderr:", file=sys.stderr)
         print(stderr, file=sys.stderr)
 
-    return error_count
+    return (True, error_count)
 
 
 def main() -> int:
-    error_count = run_semgrep()
+    overall_ok = True
 
-    if error_count < 0:
-        print("[GATE] FAIL (Semgrep could not run)", file=sys.stderr)
-        return 1
+    # 1) Dafny
+    dafny_ok = run_dafny()
+    if not dafny_ok:
+        overall_ok = False
 
-    if error_count > 0:
-        print("[GATE] FAIL (Semgrep ERROR findings)", file=sys.stderr)
-        return 1
+    # 2) Semgrep
+    semgrep_ok, semgrep_error_count = run_semgrep()
+    if not semgrep_ok:
+        overall_ok = False
+    elif semgrep_error_count > 0:
+        overall_ok = False
 
-    print("[GATE] PASS")
-    return 0
+    if overall_ok:
+        print("[GATE] PASS")
+        return 0
+
+    print("[GATE] FAIL", file=sys.stderr)
+    return 1
 
 
 if __name__ == "__main__":

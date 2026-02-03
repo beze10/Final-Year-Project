@@ -1,0 +1,12 @@
+[GATE] Dafny version:
+4.11.0+fcb2042d6d043a2634f0854338c08feeaaaf4ae2
+
+[GATE] Dafny command:
+dafny verify check.dfy specs/dafny/ExampleSpec.dfy
+
+[GATE] Dafny stdout:
+
+Dafny program verifier finished with 2 verified, 0 errors
+
+[GATE] Dafny stderr:
+
