@@ -19,10 +19,10 @@ jobs:
           DAFNY_VERSION=4.11.0
           curl -L -o dafny.zip "https://github.com/dafny-lang/dafny/releases/download/v${DAFNY_VERSION}/dafny-${DAFNY_VERSION}-x64-ubuntu-22.04.zip"
           unzip dafny.zip -d dafny
+          ls -la "$PWD/dafny/dafny"
           chmod +x "$PWD/dafny/dafny/dafny"
           sudo ln -sf "$PWD/dafny/dafny" /usr/local/bin/dafny
           dafny --version
 
       - name: Run verification gate
         run: python3 verify_gate/gate.py
-        
