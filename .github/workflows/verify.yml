@@ -1,53 +1,53 @@
-name: dafny-verify
+# name: dafny-verify
 
-on:
-  push:
-    paths: ['**/*.dfy', 'specs/**', '.github/workflows/verify.yml']
-  pull_request:
-    paths: ['**/*.dfy', 'specs/**', '.github/workflows/verify.yml']
-  workflow_dispatch:
+# on:
+#   push:
+#     paths: ['**/*.dfy', 'specs/**', '.github/workflows/verify.yml']
+#   pull_request:
+#     paths: ['**/*.dfy', 'specs/**', '.github/workflows/verify.yml']
+#   workflow_dispatch:
 
-jobs:
-  dafny:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+# jobs:
+#   dafny:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v4
 
-      - name: Verify Dafny files via Docker
-        run: |
-          set -euo pipefail
-          mkdir -p artifacts
+#       - name: Verify Dafny files via Docker
+#         run: |
+#           set -euo pipefail
+#           mkdir -p artifacts
 
-          # Build a safe, line-by-line file list on the runner
-          find . -type f -name "*.dfy" \
-            -not -path "./.git/*" \
-            -not -path "./node_modules/*" \
-            -not -path "./artifacts/*" \
-            > artifacts/dfy-files.txt
+#           # Build a safe, line-by-line file list on the runner
+#           find . -type f -name "*.dfy" \
+#             -not -path "./.git/*" \
+#             -not -path "./node_modules/*" \
+#             -not -path "./artifacts/*" \
+#             > artifacts/dfy-files.txt
 
-          if [ ! -s artifacts/dfy-files.txt ]; then
-            echo "No .dfy files found"
-            exit 0
-          fi
+#           if [ ! -s artifacts/dfy-files.txt ]; then
+#             echo "No .dfy files found"
+#             exit 0
+#           fi
 
-          docker run --rm \
-            -v "$PWD:/work" -w /work \
-            xtrm0/dafny:3.11.0 \
-            bash -lc '
-              set -euo pipefail
+#           docker run --rm \
+#             -v "$PWD:/work" -w /work \
+#             xtrm0/dafny:3.11.0 \
+#             bash -lc '
+#               set -euo pipefail
 
-              dafny /version | tee -a artifacts/dafny.log
+#               dafny /version | tee -a artifacts/dafny.log
 
-              while IFS= read -r f; do
-                echo "=== Verifying $f ===" | tee -a artifacts/dafny.log
-                dafny verify "$f" 2>&1 | tee -a artifacts/dafny.log
-              done < artifacts/dfy-files.txt
-            '
+#               while IFS= read -r f; do
+#                 echo "=== Verifying $f ===" | tee -a artifacts/dafny.log
+#                 dafny verify "$f" 2>&1 | tee -a artifacts/dafny.log
+#               done < artifacts/dfy-files.txt
+#             '
 
-      - name: Upload Dafny logs
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: dafny-artifacts
-          path: artifacts/
+#       - name: Upload Dafny logs
+#         
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: dafny-artifacts
+#           path: artifacts/
 

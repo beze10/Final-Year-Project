@@ -1,3 +1,5 @@
+// Good JavaScript
+
 import crypto from "node:crypto";
 
 export function renderMessage(container, message) {
