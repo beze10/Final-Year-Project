@@ -1,7 +1,99 @@
 rules:
-  - id: python-no-eval
-    languages:
-      - python
-    message: "Avoid using eval() due to security risks."
+  # ============================================================
+  # Policy: No eval on user input (Dafny: AllowEvalOnUserInput() == false)
+  # ============================================================
+
+  - id: python.policy.no-eval
+    message: "Policy violation: eval() enables code injection. Avoid evaluating user-controlled strings."
     severity: ERROR
+    languages: [python]
     pattern: eval(...)
+
+  - id: js.policy.no-eval
+    message: "Policy violation: eval() enables code injection. Avoid evaluating user-controlled strings."
+    severity: ERROR
+    languages: [javascript, typescript]
+    pattern: eval(...)
+
+  # ============================================================
+  # Policy: No user input embedded in SQL text (Dafny: SafeSql)
+  # Targets your bad_example.py pattern:
+  #   query = "SELECT ..." + username
+  #   cursor.execute(query)
+  # ============================================================
+
+  - id: python.policy.sql-string-concat-to-execute
+    message: "Policy violation: SQL built via string concatenation and passed to execute(). Use parameterised queries."
+    severity: ERROR
+    languages: [python]
+    patterns:
+      - pattern: $Q = $SQL + $X
+      - pattern: $CUR.execute($Q, ...)
+      - metavariable-regex:
+          metavariable: $SQL
+          regex: "(?i).*\\b(select|insert|update|delete)\\b.*"
+
+  # (Optional) Also catch direct concatenation inside execute(...)
+  - id: python.policy.sql-direct-concat-in-execute
+    message: "Policy violation: SQL concatenation passed directly into execute(). Use parameterised queries."
+    severity: ERROR
+    languages: [python]
+    patterns:
+      - pattern-either:
+          - pattern: $CUR.execute($SQL + $X, ...)
+          - pattern: $CUR.execute($X + $SQL, ...)
+      - metavariable-regex:
+          metavariable: $SQL
+          regex: "(?i).*\\b(select|insert|update|delete)\\b.*"
+
+  # ============================================================
+  # Policy: Render untrusted input as text only (Dafny: SafeRender == TextOnly)
+  # Targets your bad_example.js line:
+  #   container.innerHTML = message;
+  # ============================================================
+
+  - id: js.policy.no-innerhtml
+    message: "Policy violation: assigning to innerHTML can cause XSS. Use textContent or sanitise input."
+    severity: ERROR
+    languages: [javascript, typescript]
+    pattern: $EL.innerHTML = $X
+
+  # ============================================================
+  # Policy: No user input embedded in shell commands (Dafny: SafeCommand)
+  # Targets your bad_example.js line:
+  #   exec("ls " + userInput);
+  # ============================================================
+
+  - id: js.policy.exec-string-concat
+    message: "Policy violation: child_process.exec with concatenated input (command injection risk). Use execFile/spawn with args."
+    severity: ERROR
+    languages: [javascript, typescript]
+    patterns:
+      - pattern-either:
+          - pattern: exec($CMD + $X, ...)
+          - pattern: exec($X + $CMD, ...)
+          - pattern: exec(`$CMD ${$X}`, ...)
+          - pattern: exec(`${$CMD} ${$X}`, ...)
+    metadata:
+      policy: "No user input embedded in shell commands"
+
+  # ============================================================
+  # Policy: Tokens must come from a secure random source (Dafny: SecureTokenSource)
+  # Targets your bad_example.js function name:
+  #   export function insecureToken() { return Math.random()... }
+  # ============================================================
+
+  - id: js.policy.no-math-random-in-token-functions
+    message: "Policy violation: Math.random() is not cryptographically secure for tokens. Use crypto.randomBytes/randomUUID."
+    severity: ERROR
+    languages: [javascript, typescript]
+    patterns:
+      - pattern: |
+          function $F(...) {
+            ...
+            Math.random(...)
+            ...
+          }
+      - metavariable-regex:
+          metavariable: $F
+          regex: "(?i).*(token|session|auth|key).*"
