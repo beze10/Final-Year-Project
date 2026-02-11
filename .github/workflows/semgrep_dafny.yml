@@ -13,14 +13,19 @@ jobs:
       - name: Install Python deps (Semgrep)
         run: python3 -m pip install semgrep
 
-      - name: Install Dafny (pinned)
+            - name: Install Dafny (pinned)
         run: |
           set -eux
           DAFNY_VERSION=4.11.0
           curl -L -o dafny.zip "https://github.com/dafny-lang/dafny/releases/download/v${DAFNY_VERSION}/dafny-${DAFNY_VERSION}-x64-ubuntu-22.04.zip"
-          unzip dafny.zip -d dafny
-          sudo ln -sf "$PWD/dafny/dafny" /usr/local/bin/dafny
+          unzip -q dafny.zip -d dafny
+
+          # link the executable (not the folder)
+          chmod +x "$PWD/dafny/dafny/dafny"
+          sudo ln -sf "$PWD/dafny/dafny/dafny" /usr/local/bin/dafny
+
           dafny --version
+
 
       - name: Run verification gate
         run: python3 verify_gate/gate.py
