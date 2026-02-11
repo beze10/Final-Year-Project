@@ -1,4 +1,4 @@
-// Good JavaScript
+// Good JavaScript.
 
 import crypto from "node:crypto";
 
