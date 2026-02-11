@@ -1,4 +1,4 @@
-# Good Python 
+# Good Python.
 
 import sqlite3
 import re
