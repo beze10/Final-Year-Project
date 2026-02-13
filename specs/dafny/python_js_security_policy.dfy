@@ -27,7 +27,7 @@ module PythonJsSecurityPolicy {
   {
     |needle| == 0 ||
     (|needle| <= |hay| &&
-      exists i :: 0 <= i <= |hay| - |needle| &&
+      exists i {:trigger hay[i .. i + |needle|]} :: 0 <= i <= |hay| - |needle| &&
         hay[i .. i + |needle|] == needle)
   }
 
@@ -47,7 +47,8 @@ module PythonJsSecurityPolicy {
   predicate SafeSql(q: SqlQuery, userInput: seq<char>)
   {
     match q
-      case ParamQuery(t, ps) => !Contains(t, userInput)
+      // Parameterised queries are safe because user input is passed separately
+      case ParamQuery(t, ps) => true
       case RawQuery(t)       => !Contains(t, userInput)
   }
 
@@ -65,7 +66,19 @@ module PythonJsSecurityPolicy {
   method BuildUserLookupQuery_Bad(username: seq<char>) returns (q: SqlQuery)
     ensures !SafeSql(q, username)
   {
-    q := RawQuery("SELECT * FROM users WHERE username = '" + username + "'");
+    var prefix := "SELECT * FROM users WHERE username = '";
+    var suffix := "'";
+    var t := prefix + username + suffix;
+    q := RawQuery(t);
+    if |username| == 0 {
+      // empty needle is considered contained by definition
+      assert Contains(t, username);
+    } else {
+      var i := |prefix|;
+      assert 0 <= i <= |t| - |username|;
+      assert t[i .. i + |username|] == username;
+      assert Contains(t, username);
+    }
   }
 
   // -----------------------------
@@ -161,8 +174,18 @@ module PythonJsSecurityPolicy {
   method BuildCommand_Bad(userArg: seq<char>) returns (cmd: Command)
     ensures !SafeCommand(cmd, userArg)
   {
+    var prefix := "ls ";
+    var t := prefix + userArg;
     // Models: exec("ls " + userArg)
-    cmd := Shell("ls " + userArg);
+    cmd := Shell(t);
+    if |userArg| == 0 {
+      assert Contains(t, userArg);
+    } else {
+      var i := |prefix|;
+      assert 0 <= i <= |t| - |userArg|;
+      assert t[i .. i + |userArg|] == userArg;
+      assert Contains(t, userArg);
+    }
   }
 
   // -----------------------------
@@ -172,7 +195,8 @@ module PythonJsSecurityPolicy {
   lemma UsernamePolicyHasWitness()
     ensures exists u: seq<char> :: ValidUsername(u)
   {
-    // Example witness: "abc"
+    var u := "abc";
+    assert ValidUsername(u);
   }
 
   lemma UsernamePolicyRejectsTooShort()

@@ -5,58 +5,8 @@
 dafny verify specs/dafny/python_js_security_policy.dfy
 
 [GATE] Dafny stdout:
-specs/dafny/python_js_security_policy.dfy(30,6): Warning: Could not find a trigger for this quantifier. Without a trigger, the quantifier may cause brittle verification. To silence this warning, add an explicit trigger using the {:trigger} attribute. For more information, see the section on quantifier instantiation rules in the reference manual.
-   |
-30 |       exists i :: 0 <= i <= |hay| - |needle| &&
-   |       ^^^^^^
 
-specs/dafny/python_js_security_policy.dfy(59,2): Error: a postcondition could not be proved on this return path
-   |
-59 |   {
-   |   ^
-
-specs/dafny/python_js_security_policy.dfy(58,19): Related location: this is the postcondition that could not be proved
-   |
-58 |     ensures SafeSql(q, username)
-   |                    ^
-
-specs/dafny/python_js_security_policy.dfy(50,22): Related location: this proposition could not be proved
-   |
-50 |       case ParamQuery(t, ps) => !Contains(t, userInput)
-   |                       ^
-
-specs/dafny/python_js_security_policy.dfy(67,2): Error: a postcondition could not be proved on this return path
-   |
-67 |   {
-   |   ^
-
-specs/dafny/python_js_security_policy.dfy(66,12): Related location: this is the postcondition that could not be proved
-   |
-66 |     ensures !SafeSql(q, username)
-   |             ^
-
-specs/dafny/python_js_security_policy.dfy(163,2): Error: a postcondition could not be proved on this return path
-    |
-163 |   {
-    |   ^
-
-specs/dafny/python_js_security_policy.dfy(162,12): Related location: this is the postcondition that could not be proved
-    |
-162 |     ensures !SafeCommand(cmd, userArg)
-    |             ^
-
-specs/dafny/python_js_security_policy.dfy(174,2): Error: a postcondition could not be proved on this return path
-    |
-174 |   {
-    |   ^
-
-specs/dafny/python_js_security_policy.dfy(173,12): Related location: this is the postcondition that could not be proved
-    |
-173 |     ensures exists u: seq<char> :: ValidUsername(u)
-    |             ^^^^^^
-
-
-Dafny program verifier finished with 11 verified, 4 errors
+Dafny program verifier finished with 15 verified, 0 errors
 
 [GATE] Dafny stderr:
 
