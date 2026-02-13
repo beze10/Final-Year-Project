@@ -1,5 +1,6 @@
 import json
 import subprocess
+import shutil
 import sys
 from pathlib import Path
 
@@ -49,11 +50,23 @@ def run_dafny() -> bool:
         DAFNY_LOG.write_text("[GATE] No Dafny files found. Skipped.\n", encoding="utf-8")
         return True
 
-    try:
-        ver = subprocess.run(["dafny", "--version"], capture_output=True, text=True)
-    except FileNotFoundError:
-        print("[GATE] dafny not found on PATH.", file=sys.stderr)
+    # Check for dafny on PATH and provide actionable guidance if missing
+    if shutil.which("dafny") is None:
+        msg = (
+            "[GATE] dafny not found on PATH.\n"
+            "Install Dafny and ensure the 'dafny' command is on your PATH.\n\n"
+            "Common install options:\n"
+            "- Homebrew (if available): brew install dafny\n"
+            "- .NET global tool: dotnet tool install -g dafny\n"
+            "  then add to PATH: export PATH=\"$PATH:$HOME/.dotnet/tools\"\n"
+            "- Download a release: https://github.com/dafny-lang/dafny/releases\n\n"
+            "After installing, verify with: dafny --version\n"
+        )
+        print(msg, file=sys.stderr)
+        DAFNY_LOG.write_text(msg + "\n", encoding="utf-8")
         return False
+
+    ver = subprocess.run(["dafny", "--version"], capture_output=True, text=True)
 
     header = f"[GATE] Dafny version:\n{ver.stdout.strip() or ver.stderr.strip()}\n\n"
     print(header.strip())
