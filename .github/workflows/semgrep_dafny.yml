@@ -36,3 +36,11 @@ jobs:
 
       - name: Run verification gate
         run: python3 verify_gate/gate.py
+
+      - name: Upload Dafny and Semgrep logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-logs
+          path: artifacts/
+          retention-days: 30
