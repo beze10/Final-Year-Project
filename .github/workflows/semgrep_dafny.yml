@@ -20,11 +20,17 @@ jobs:
           curl -L -o dafny.zip "https://github.com/dafny-lang/dafny/releases/download/v${DAFNY_VERSION}/dafny-${DAFNY_VERSION}-x64-ubuntu-22.04.zip"
           unzip dafny.zip -d dafny
           echo "Contents of extracted folder:"
-          ls -la dafny
-          echo "Contents inside dafny/dafny:"
-          ls -la dafny/dafny
-          chmod +x dafny/dafny/dafny
-          sudo ln -sf "$PWD/dafny/dafny/dafny" /usr/local/bin/dafny
+          ls -la dafny || true
+          # Locate the dafny executable anywhere under the extracted folder
+          DAFNY_BIN=$(find dafny -type f -name dafny -print -quit || true)
+          if [ -z "${DAFNY_BIN}" ]; then
+            echo "ERROR: could not find 'dafny' executable after unzip" >&2
+            ls -R dafny >&2 || true
+            exit 1
+          fi
+          echo "Found dafny binary at: ${DAFNY_BIN}"
+          chmod +x "${DAFNY_BIN}"
+          sudo ln -sf "${PWD}/${DAFNY_BIN}" /usr/local/bin/dafny
           which dafny
           dafny --version
 
