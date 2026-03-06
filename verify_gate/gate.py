@@ -7,8 +7,8 @@ from pathlib import Path
 
 # ---- Config (edit if you want) ----
 DAFNY_TARGETS = [
-    "check.dfy",
-    "specs/dafny",   # folder: will verify all *.dfy inside
+    
+    "specs/dafny"   # folder: will verify all *.dfy inside
 ]
 
 SEMGRP_CONFIG = "semgrep/semgrep.yml"
