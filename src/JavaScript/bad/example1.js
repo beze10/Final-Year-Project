@@ -1,17 +1,13 @@
-// Bad implementation
-import { exec } from "node:child_process";
+// Good JavaScript
 
-export function renderMessageUnsafe(container, message) {
-  // BAD: DOM-based XSS
-  container.innerHTML = message;
+import crypto from "node:crypto";
+
+export function renderMessage(container, message) {
+  // GOOD: prevents XSS
+  container.textContent = String(message);
 }
 
-export function runCommand(userInput) {
-  // BAD: command injection
-  exec("ls " + userInput);
-}
-
-export function insecureToken() {
-  // BAD: weak randomness
-  return Math.random().toString(36);
+export function createSessionToken() {
+  // GOOD: cryptographically secure random token
+  return crypto.randomBytes(32).toString("hex");
 }
