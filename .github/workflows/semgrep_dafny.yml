@@ -1,5 +1,4 @@
 name: Verification Gate (Dafny + Semgrep)
-
 on:
   push:
   pull_request:
@@ -12,7 +11,7 @@ jobs:
 
       - name: Install Python deps (Semgrep)
         run: python3 -m pip install semgrep
-
+         #AI helped me fixed a bug when downloading Dafny and added a couple of command lines below but I wrote majority of this code manually.
       - name: Install Dafny (pinned)
         run: |
           set -eux
@@ -21,7 +20,6 @@ jobs:
           unzip dafny.zip -d dafny
           echo "Contents of extracted folder:"
           ls -la dafny || true
-          # Locate the dafny executable anywhere under the extracted folder
           DAFNY_BIN=$(find dafny -type f -name dafny -print -quit || true)
           if [ -z "${DAFNY_BIN}" ]; then
             echo "ERROR: could not find 'dafny' executable after unzip" >&2
