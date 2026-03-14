@@ -10,4 +10,4 @@ export function renderMessage(container, message) {
 export function createSessionToken() {
   // GOOD: cryptographically secure random token
   return crypto.randomBytes(32).toString("hex");
-}ß
+}
