@@ -1,4 +1,4 @@
-//Bad implementartion.
+//Bad implementation
 import { exec } from "node:child_process";
 
 export function renderMessageUnsafe(container, message) {
@@ -8,7 +8,7 @@ export function renderMessageUnsafe(container, message) {
 
 export function runCommand(userInput) {
   // BAD: command injection
-  exec("ls " + userInput);
+  exec("ls " + userInput);ß
 }
 
 export function insecureToken() {
