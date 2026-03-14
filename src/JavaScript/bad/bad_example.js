@@ -1,4 +1,4 @@
-//Bad implementation
+//Bad code
 import { exec } from "node:child_process";
 
 export function renderMessageUnsafe(container, message) {
