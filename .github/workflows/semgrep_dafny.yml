@@ -20,6 +20,7 @@ jobs:
           unzip dafny.zip -d dafny
           echo "Contents of extracted folder:"
           ls -la dafny || true
+          # Locate the dafny executable anywhere under the extracted folder
           DAFNY_BIN=$(find dafny -type f -name dafny -print -quit || true)
           if [ -z "${DAFNY_BIN}" ]; then
             echo "ERROR: could not find 'dafny' executable after unzip" >&2
