@@ -1,3 +1,5 @@
+#AI assistance used to write below code semgrep rules, but manually reveiwed and edited.
+
 rules:
   # ============================================================
   # Policy: No eval on user input (Dafny: AllowEvalOnUserInput() == false)
@@ -33,7 +35,7 @@ rules:
           metavariable: $SQL
           regex: "(?i).*\\b(select|insert|update|delete)\\b.*"
 
-  # (Optional) Also catch direct concatenation inside execute(...)
+  #  Also catch direct concatenation inside execute(...)
   - id: python.policy.sql-direct-concat-in-execute
     message: "Policy violation: SQL concatenation passed directly into execute(). Use parameterised queries."
     severity: ERROR

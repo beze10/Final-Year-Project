@@ -1,7 +1,5 @@
 // specs/python_js_security_policy.dfy
-// Dafny POLICY spec for your Python/JS good vs bad examples.
-// - Semgrep checks the actual Python/JS code patterns.
-// - Dafny proves the underlying security policies are logically sound.
+ //AI assistance used but manually edited and reviewed
 
 module PythonJsSecurityPolicy {
 
@@ -30,7 +28,7 @@ module PythonJsSecurityPolicy {
       exists i {:trigger hay[i .. i + |needle|]} :: 0 <= i <= |hay| - |needle| &&
         hay[i .. i + |needle|] == needle)
   }
-
+ 
   // -----------------------------
   // 1. Python: safe query policy
   // -----------------------------

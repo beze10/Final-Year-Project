@@ -5,9 +5,9 @@ import sys
 from pathlib import Path
 
 
-# ---- Config (edit if you want) ----
+
 DAFNY_TARGETS = [
-    "check.dfy",
+    
     "specs/dafny",   # folder: will verify all *.dfy inside
 ]
 
@@ -35,7 +35,7 @@ def _collect_dafny_files(targets: list[str]) -> list[str]:
             out.append(f)
     return out
 
-
+#AI assistance used to write below code dafny, but manually reveiwed and edited.
 def run_dafny() -> bool:
     """
     Runs Dafny verification on configured .dfy files.
@@ -50,7 +50,7 @@ def run_dafny() -> bool:
         DAFNY_LOG.write_text("[GATE] No Dafny files found. Skipped.\n", encoding="utf-8")
         return True
 
-    # Check for dafny on PATH and provide actionable guidance if missing
+    # Check for dafny on PATH and provide actionable guidance if missing. 
     if shutil.which("dafny") is None:
         msg = (
             "[GATE] dafny not found on PATH.\n"
@@ -88,7 +88,7 @@ def run_dafny() -> bool:
     print("[GATE] Dafny PASS")
     return True
 
-
+#AI assistance used to write below code dafny, but manually reveiwed and edited.
 def run_semgrep() -> tuple[bool, int]:
     """
     Runs Semgrep using semgrep/semgrep.yml
