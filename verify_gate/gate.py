@@ -14,10 +14,22 @@ DAFNY_TARGETS = [
 
 SEMGRP_CONFIG = "semgrep/semgrep.yml"
 SUPPORTED_SEMGREP_EXTS = {".py", ".js", ".ts", ".jsx", ".tsx", ".dfy"}
+SEMGREP_EXCLUDED_DIRS = (
+    "src/JavaScript/bad",
+    "src/python/bad",
+)
 
 ARTIFACTS_DIR = Path("artifacts")
 DAFNY_LOG = ARTIFACTS_DIR / "dafny.log"
 SEMGRP_JSON = ARTIFACTS_DIR / "semgrep.json"
+
+
+def _is_semgrep_excluded(path_str: str) -> bool:
+    normalised = path_str.replace(chr(92), "/")
+    return any(
+        normalised == excluded or normalised.startswith(f"{excluded}/")
+        for excluded in SEMGREP_EXCLUDED_DIRS
+    )
 
 
 def _collect_dafny_files(targets: list[str]) -> list[str]:
@@ -190,12 +202,14 @@ def run_semgrep() -> tuple[bool, int]:
             scan_targets = [
                 f
                 for f in scan_targets
-                if Path(f).suffix in SUPPORTED_SEMGREP_EXTS and Path(f).exists()
+                if Path(f).suffix in SUPPORTED_SEMGREP_EXTS
+                and Path(f).exists()
+                and not _is_semgrep_excluded(f)
             ]
             if scan_targets:
                 print(f"[GATE] Scanning {len(scan_targets)} changed file(s)")
             else:
-                print("[GATE] No changed Semgrep-supported files detected. Skipping Semgrep.")
+                print("[GATE] No changed Semgrep-supported files detected outside excluded demo folders. Skipping Semgrep.")
                 write_empty_semgrep_result()
                 return (True, 0)
     except Exception as e:
@@ -207,6 +221,8 @@ def run_semgrep() -> tuple[bool, int]:
         scan_targets = []  # Empty list = scan current directory
 
     cmd = ["semgrep", "scan", "--config", SEMGRP_CONFIG, "--json"]
+    for excluded_dir in SEMGREP_EXCLUDED_DIRS:
+        cmd.extend(["--exclude", excluded_dir])
     if scan_targets:
         cmd.extend(scan_targets)
 
