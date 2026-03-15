@@ -34,7 +34,14 @@ jobs:
           dafny --version
 
       - name: Run verification gate
-        run: python3 verify_gate/gate.py
+        run: |
+          # Ensure the base branch is available for diffs (handles PR and push checkouts)
+          if [ -n "$GITHUB_EVENT_NAME" ] && [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            git fetch origin "$GITHUB_BASE_REF" --depth=1 || true
+          else
+            git fetch origin --depth=1 || true
+          fi
+          python3 verify_gate/gate.py
 
       - name: Upload Dafny and Semgrep logs
         if: always()

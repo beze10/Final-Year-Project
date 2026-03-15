@@ -115,34 +115,49 @@ def run_semgrep() -> tuple[bool, int]:
         if event_name == "pull_request" and base_ref:
             # PR event: use the target branch
             compare_ref = f"origin/{base_ref}"
-        elif is_ci:
-            # Push event in CI: use the previous commit
-            compare_ref = "HEAD~1"
         else:
-            # Local development: try HEAD~1, fall back to scanning all files
+            # Push or local: use the previous commit
             compare_ref = "HEAD~1"
-        
-        # Try to get files changed since the comparison point
-        if compare_ref:
+
+        def try_diff(ref: str) -> list[str]:
             proc = subprocess.run(
-                ["git", "diff", "--name-only", f"{compare_ref}...HEAD"],
+                ["git", "diff", "--name-only", f"{ref}...HEAD"],
                 capture_output=True,
                 text=True,
                 check=False
             )
-            
             if proc.returncode == 0 and proc.stdout.strip():
-                scan_targets = proc.stdout.strip().split("\n")
-                # Filter to only supported file types
-                supported_exts = {".py", ".js", ".ts", ".jsx", ".tsx", ".dfy"}
-                scan_targets = [f for f in scan_targets if Path(f).suffix in supported_exts and Path(f).exists()]
-                if scan_targets:
-                    print(f"[GATE] Scanning {len(scan_targets)} changed file(s)")
-            elif proc.returncode != 0:
-                print(f"[GATE] Warning: Could not get changed files in git, will scan all files", file=sys.stderr)
+                return proc.stdout.strip().split("\n")
+            return []
+
+        # First attempt
+        if compare_ref:
+            scan_targets = try_diff(compare_ref)
+
+        # If no previous commit exists or diff returned nothing, try to fetch more history
+        if not scan_targets:
+            try:
+                # Only attempt a network fetch if an 'origin' remote exists
+                remotes = subprocess.run(["git", "remote"], capture_output=True, text=True)
+                if remotes.returncode == 0 and "origin" in (remotes.stdout or ""):
+                    print("[GATE] Attempting to fetch additional history to compute diffs")
+                    subprocess.run(["git", "fetch", "origin", "--depth=50"], check=False)
+                    if event_name == "pull_request" and base_ref:
+                        subprocess.run(["git", "fetch", "origin", base_ref, "--depth=1"], check=False)
+                    # Retry diff after fetch
+                    scan_targets = try_diff(compare_ref)
+            except Exception:
+                pass
+
+        # Filter to supported files
+        if scan_targets:
+            supported_exts = {".py", ".js", ".ts", ".jsx", ".tsx", ".dfy"}
+            scan_targets = [f for f in scan_targets if Path(f).suffix in supported_exts and Path(f).exists()]
+            if scan_targets:
+                print(f"[GATE] Scanning {len(scan_targets)} changed file(s)")
     except Exception as e:
         print(f"[GATE] Warning: Error detecting changed files: {e}, will scan all files", file=sys.stderr)
-    
+
     # If no targets found, scan entire repo
     if not scan_targets:
         print("[GATE] Scanning all files in repo")
