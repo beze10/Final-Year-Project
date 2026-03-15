@@ -2,6 +2,7 @@ import json
 import subprocess
 import shutil
 import sys
+import os
 from pathlib import Path
 
 
@@ -92,13 +93,47 @@ def run_dafny() -> bool:
 def run_semgrep() -> tuple[bool, int]:
     """
     Runs Semgrep using semgrep/semgrep.yml
+    In GitHub Actions (CI=true), scans only changed files in the push/PR.
+    Locally, scans the entire repo.
     Writes JSON output to artifacts/semgrep.json
     Returns (ok, error_count)
     ok=False means Semgrep couldn't run or output couldn't be parsed.
     """
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
 
+    # Detect if running in GitHub Actions
+    is_ci = os.getenv("CI") == "true"
+    
+    # Get changed files for CI, otherwise scan entire repo
+    scan_targets = []
+    if is_ci:
+        try:
+            # Get list of changed files from the current commit/PR
+            proc = subprocess.run(
+                ["git", "diff", "--name-only", "origin/main...HEAD"],
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            if proc.returncode == 0 and proc.stdout.strip():
+                scan_targets = proc.stdout.strip().split("\n")
+                # Filter to only supported file types
+                supported_exts = {".py", ".js", ".ts", ".jsx", ".tsx", ".dfy"}
+                scan_targets = [f for f in scan_targets if Path(f).suffix in supported_exts and Path(f).exists()]
+                if scan_targets:
+                    print(f"[GATE] CI mode: scanning {len(scan_targets)} changed file(s)")
+        except Exception as e:
+            print(f"[GATE] Warning: Could not get changed files: {e}", file=sys.stderr)
+    
+    # If no targets found (local run or CI couldn't get diffs), scan entire repo
+    if not scan_targets:
+        if is_ci:
+            print("[GATE] No changed files detected, scanning entire repo")
+        scan_targets = []  # Empty list = scan current directory
+
     cmd = ["semgrep", "scan", "--config", SEMGRP_CONFIG, "--json"]
+    if scan_targets:
+        cmd.extend(scan_targets)
 
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True)
