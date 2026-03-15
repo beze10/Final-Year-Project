@@ -52,7 +52,7 @@ def run_dafny() -> bool:
         DAFNY_LOG.write_text("[GATE] No Dafny files found. Skipped.\n", encoding="utf-8")
         return True
 
-    # Check for dafny on PATH and provide actionable guidance if missing. 
+    # AI assistance used to write below code. Checks for dafny on PATH and provide actionable guidance if missing.
     if shutil.which("dafny") is None:
         msg = (
             "[GATE] dafny not found on PATH.\n"
