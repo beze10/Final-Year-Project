@@ -13,6 +13,7 @@ DAFNY_TARGETS = [
 ]
 
 SEMGRP_CONFIG = "semgrep/semgrep.yml"
+SUPPORTED_SEMGREP_EXTS = {".py", ".js", ".ts", ".jsx", ".tsx", ".dfy"}
 
 ARTIFACTS_DIR = Path("artifacts")
 DAFNY_LOG = ARTIFACTS_DIR / "dafny.log"
@@ -101,65 +102,107 @@ def run_semgrep() -> tuple[bool, int]:
     """
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Get changed files when possible, otherwise scan entire repo
-    scan_targets = []
+    # Get changed files when possible, otherwise scan entire repo.
+    scan_targets: list[str] = []
+    changed_files_detected = False
+
+    def write_empty_semgrep_result() -> None:
+        SEMGRP_JSON.write_text(
+            json.dumps({"results": [], "errors": [], "paths": {"scanned": []}}),
+            encoding="utf-8",
+        )
+
+    def try_diff(range_spec: str) -> tuple[bool, list[str]]:
+        proc = subprocess.run(
+            ["git", "diff", "--name-only", range_spec],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if proc.returncode != 0:
+            return (False, [])
+
+        files = [line for line in proc.stdout.splitlines() if line.strip()]
+        return (True, files)
+
     try:
-        # Try to detect what changed in the current commit/branch
         is_ci = os.getenv("CI") == "true"
         event_name = os.getenv("GITHUB_EVENT_NAME", "")
-        base_ref = os.getenv("GITHUB_BASE_REF")
-        
-        compare_ref = None
-        
-        # Determine the appropriate reference to compare against
-        if event_name == "pull_request" and base_ref:
-            # PR event: use the target branch
-            compare_ref = f"origin/{base_ref}"
-        else:
-            # Push or local: use the previous commit
-            compare_ref = "HEAD~1"
+        base_ref = (os.getenv("GITHUB_BASE_REF") or "").strip()
+        default_branch = (os.getenv("GITHUB_DEFAULT_BRANCH") or "").strip()
+        ref_name = (os.getenv("GITHUB_REF_NAME") or "").strip()
+        event_before = (os.getenv("GITHUB_EVENT_BEFORE") or "").strip()
 
-        def try_diff(ref: str) -> list[str]:
-            proc = subprocess.run(
-                ["git", "diff", "--name-only", f"{ref}...HEAD"],
-                capture_output=True,
-                text=True,
-                check=False
+        diff_candidates: list[tuple[str, str]] = []
+
+        if is_ci and event_name == "pull_request" and base_ref:
+            diff_candidates.append(
+                (f"origin/{base_ref}...HEAD", f"pull request changes against {base_ref}")
             )
-            if proc.returncode == 0 and proc.stdout.strip():
-                return proc.stdout.strip().split("\n")
-            return []
+        elif is_ci and event_name == "push":
+            if default_branch and ref_name and ref_name != default_branch:
+                diff_candidates.append(
+                    (
+                        f"origin/{default_branch}...HEAD",
+                        f"branch changes against {default_branch}",
+                    )
+                )
 
-        # First attempt
-        if compare_ref:
-            scan_targets = try_diff(compare_ref)
+            if event_before and event_before != "0000000000000000000000000000000000000000":
+                diff_candidates.append(
+                    (f"{event_before}..HEAD", "the commits included in this push")
+                )
 
-        # If no previous commit exists or diff returned nothing, try to fetch more history
-        if not scan_targets:
+        for range_spec, description in diff_candidates:
+            diff_ok, changed_files = try_diff(range_spec)
+            if diff_ok:
+                changed_files_detected = True
+                scan_targets = changed_files
+                print(f"[GATE] Using diff range {range_spec} for {description}")
+                break
+
+        # If the baseline ref is missing, try fetching just enough history and retry.
+        if diff_candidates and not changed_files_detected:
             try:
-                # Only attempt a network fetch if an 'origin' remote exists
                 remotes = subprocess.run(["git", "remote"], capture_output=True, text=True)
                 if remotes.returncode == 0 and "origin" in (remotes.stdout or ""):
                     print("[GATE] Attempting to fetch additional history to compute diffs")
-                    subprocess.run(["git", "fetch", "origin", "--depth=50"], check=False)
-                    if event_name == "pull_request" and base_ref:
-                        subprocess.run(["git", "fetch", "origin", base_ref, "--depth=1"], check=False)
-                    # Retry diff after fetch
-                    scan_targets = try_diff(compare_ref)
+                    fetch_target = base_ref or default_branch
+                    if fetch_target:
+                        subprocess.run(
+                            ["git", "fetch", "origin", fetch_target, "--depth=50"],
+                            check=False,
+                        )
+                    else:
+                        subprocess.run(["git", "fetch", "origin", "--depth=50"], check=False)
+
+                    for range_spec, description in diff_candidates:
+                        diff_ok, changed_files = try_diff(range_spec)
+                        if diff_ok:
+                            changed_files_detected = True
+                            scan_targets = changed_files
+                            print(f"[GATE] Using diff range {range_spec} for {description}")
+                            break
             except Exception:
                 pass
 
-        # Filter to supported files
-        if scan_targets:
-            supported_exts = {".py", ".js", ".ts", ".jsx", ".tsx", ".dfy"}
-            scan_targets = [f for f in scan_targets if Path(f).suffix in supported_exts and Path(f).exists()]
+        if changed_files_detected:
+            scan_targets = [
+                f
+                for f in scan_targets
+                if Path(f).suffix in SUPPORTED_SEMGREP_EXTS and Path(f).exists()
+            ]
             if scan_targets:
                 print(f"[GATE] Scanning {len(scan_targets)} changed file(s)")
+            else:
+                print("[GATE] No changed Semgrep-supported files detected. Skipping Semgrep.")
+                write_empty_semgrep_result()
+                return (True, 0)
     except Exception as e:
         print(f"[GATE] Warning: Error detecting changed files: {e}, will scan all files", file=sys.stderr)
 
-    # If no targets found, scan entire repo
-    if not scan_targets:
+    # If no diff could be determined, fall back to a full scan.
+    if not changed_files_detected:
         print("[GATE] Scanning all files in repo")
         scan_targets = []  # Empty list = scan current directory
 

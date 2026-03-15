@@ -6,8 +6,13 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      GITHUB_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      GITHUB_EVENT_BEFORE: ${{ github.event.before }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install Python deps (Semgrep)
         run: python3 -m pip install semgrep
@@ -35,11 +40,11 @@ jobs:
 
       - name: Run verification gate
         run: |
-          # Ensure the base branch is available for diffs (handles PR and push checkouts)
-          if [ -n "$GITHUB_EVENT_NAME" ] && [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-            git fetch origin "$GITHUB_BASE_REF" --depth=1 || true
-          else
-            git fetch origin --depth=1 || true
+          set -eux
+          # Ensure the branch used as the diff baseline is available locally.
+          COMPARE_BRANCH="${GITHUB_BASE_REF:-$GITHUB_DEFAULT_BRANCH}"
+          if [ -n "${COMPARE_BRANCH}" ]; then
+            git fetch origin "${COMPARE_BRANCH}" --depth=1 || true
           fi
           python3 verify_gate/gate.py
 
