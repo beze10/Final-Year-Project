@@ -101,52 +101,51 @@ def run_semgrep() -> tuple[bool, int]:
     """
     ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Detect if running in GitHub Actions
-    is_ci = os.getenv("CI") == "true"
-    
-    # Get changed files for CI, otherwise scan entire repo
+    # Get changed files when possible, otherwise scan entire repo
     scan_targets = []
-    if is_ci:
-        try:
-            # For PRs, use the base branch; for pushes, use the previous commit
-            event_name = os.getenv("GITHUB_EVENT_NAME", "")
-            base_ref = os.getenv("GITHUB_BASE_REF")
+    try:
+        # Try to detect what changed in the current commit/branch
+        is_ci = os.getenv("CI") == "true"
+        event_name = os.getenv("GITHUB_EVENT_NAME", "")
+        base_ref = os.getenv("GITHUB_BASE_REF")
+        
+        compare_ref = None
+        
+        # Determine the appropriate reference to compare against
+        if event_name == "pull_request" and base_ref:
+            # PR event: use the target branch
+            compare_ref = f"origin/{base_ref}"
+        elif is_ci:
+            # Push event in CI: use the previous commit
+            compare_ref = "HEAD~1"
+        else:
+            # Local development: try HEAD~1, fall back to scanning all files
+            compare_ref = "HEAD~1"
+        
+        # Try to get files changed since the comparison point
+        if compare_ref:
+            proc = subprocess.run(
+                ["git", "diff", "--name-only", f"{compare_ref}...HEAD"],
+                capture_output=True,
+                text=True,
+                check=False
+            )
             
-            compare_ref = None
-            
-            # Determine the appropriate reference to compare against
-            if event_name == "pull_request" and base_ref:
-                # PR event: use the target branch
-                compare_ref = f"origin/{base_ref}"
-            else:
-                # Push event: use the previous commit
-                compare_ref = "HEAD~1"
-            
-            # Get files changed since the comparison point
-            if compare_ref:
-                proc = subprocess.run(
-                    ["git", "diff", "--name-only", f"{compare_ref}...HEAD"],
-                    capture_output=True,
-                    text=True,
-                    check=False
-                )
-                
-                if proc.returncode == 0 and proc.stdout.strip():
-                    scan_targets = proc.stdout.strip().split("\n")
-                    # Filter to only supported file types
-                    supported_exts = {".py", ".js", ".ts", ".jsx", ".tsx", ".dfy"}
-                    scan_targets = [f for f in scan_targets if Path(f).suffix in supported_exts and Path(f).exists()]
-                    if scan_targets:
-                        print(f"[GATE] CI mode: scanning {len(scan_targets)} changed file(s)")
-                else:
-                    print(f"[GATE] Warning: git diff failed against {compare_ref}, will scan all files", file=sys.stderr)
-        except Exception as e:
-            print(f"[GATE] Warning: Could not get changed files: {e}", file=sys.stderr)
+            if proc.returncode == 0 and proc.stdout.strip():
+                scan_targets = proc.stdout.strip().split("\n")
+                # Filter to only supported file types
+                supported_exts = {".py", ".js", ".ts", ".jsx", ".tsx", ".dfy"}
+                scan_targets = [f for f in scan_targets if Path(f).suffix in supported_exts and Path(f).exists()]
+                if scan_targets:
+                    print(f"[GATE] Scanning {len(scan_targets)} changed file(s)")
+            elif proc.returncode != 0:
+                print(f"[GATE] Warning: Could not get changed files in git, will scan all files", file=sys.stderr)
+    except Exception as e:
+        print(f"[GATE] Warning: Error detecting changed files: {e}, will scan all files", file=sys.stderr)
     
-    # If no targets found (local run or CI couldn't get diffs), scan entire repo
+    # If no targets found, scan entire repo
     if not scan_targets:
-        if is_ci:
-            print("[GATE] Scanning all files in repo")
+        print("[GATE] Scanning all files in repo")
         scan_targets = []  # Empty list = scan current directory
 
     cmd = ["semgrep", "scan", "--config", SEMGRP_CONFIG, "--json"]
