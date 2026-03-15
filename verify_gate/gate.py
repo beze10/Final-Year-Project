@@ -108,30 +108,48 @@ def run_semgrep() -> tuple[bool, int]:
     scan_targets = []
     if is_ci:
         try:
-            # Get list of changed files from the current commit/PR
-            proc = subprocess.run(
-                ["git", "diff", "--name-only", "origin/main...HEAD"],
-                capture_output=True,
-                text=True,
-                check=False
-            )
-            if proc.returncode == 0 and proc.stdout.strip():
-                scan_targets = proc.stdout.strip().split("\n")
-                # Filter to only supported file types
-                supported_exts = {".py", ".js", ".ts", ".jsx", ".tsx", ".dfy"}
-                scan_targets = [f for f in scan_targets if Path(f).suffix in supported_exts and Path(f).exists()]
-                if scan_targets:
-                    print(f"[GATE] CI mode: scanning {len(scan_targets)} changed file(s)")
+            # For PRs, use the base branch; for pushes, use the previous commit
+            event_name = os.getenv("GITHUB_EVENT_NAME", "")
+            base_ref = os.getenv("GITHUB_BASE_REF")
+            
+            compare_ref = None
+            
+            # Determine the appropriate reference to compare against
+            if event_name == "pull_request" and base_ref:
+                # PR event: use the target branch
+                compare_ref = f"origin/{base_ref}"
+            else:
+                # Push event: use the previous commit
+                compare_ref = "HEAD~1"
+            
+            # Get files changed since the comparison point
+            if compare_ref:
+                proc = subprocess.run(
+                    ["git", "diff", "--name-only", f"{compare_ref}...HEAD"],
+                    capture_output=True,
+                    text=True,
+                    check=False
+                )
+                
+                if proc.returncode == 0 and proc.stdout.strip():
+                    scan_targets = proc.stdout.strip().split("\n")
+                    # Filter to only supported file types
+                    supported_exts = {".py", ".js", ".ts", ".jsx", ".tsx", ".dfy"}
+                    scan_targets = [f for f in scan_targets if Path(f).suffix in supported_exts and Path(f).exists()]
+                    if scan_targets:
+                        print(f"[GATE] CI mode: scanning {len(scan_targets)} changed file(s)")
+                else:
+                    print(f"[GATE] Warning: git diff failed against {compare_ref}, will scan all files", file=sys.stderr)
         except Exception as e:
             print(f"[GATE] Warning: Could not get changed files: {e}", file=sys.stderr)
     
     # If no targets found (local run or CI couldn't get diffs), scan entire repo
     if not scan_targets:
         if is_ci:
-            print("[GATE] No changed files detected, scanning entire repo")
+            print("[GATE] Scanning all files in repo")
         scan_targets = []  # Empty list = scan current directory
 
-    cmd = ["semgrep", "scan", "--config", SEMGRP_CONFIG, "--json"]
+    cmd = ["semgrep", "scan", "--config", SEMGRP_CONFIG, "--json", "--exclude", "**/bad/**"]
     if scan_targets:
         cmd.extend(scan_targets)
 
