@@ -149,7 +149,7 @@ def run_semgrep() -> tuple[bool, int]:
             print("[GATE] Scanning all files in repo")
         scan_targets = []  # Empty list = scan current directory
 
-    cmd = ["semgrep", "scan", "--config", SEMGRP_CONFIG, "--json", "--exclude", "**/bad/**"]
+    cmd = ["semgrep", "scan", "--config", SEMGRP_CONFIG, "--json"]
     if scan_targets:
         cmd.extend(scan_targets)
 
