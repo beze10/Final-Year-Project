@@ -1,4 +1,4 @@
-// bad code
+// bad code.
 export function renderMessageUnsafe(container, message) {
   // BAD: DOM-based XSS
   container.innerHTML = message;
